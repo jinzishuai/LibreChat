@@ -60,8 +60,9 @@ jobs:
           folder: './client/dist' # The folder the action should deploy.
           branch: gh-pages
           # repository-name: jinzishuai/LibreChat # this repo
-          # repository-name: 'jinzishuai/jinzishuai.github.io' # different repo, needs permission
-          repository-name: 'aitok-ai/aitok-ai.github.io'
+          repository-name: 'jinzishuai/jinzishuai.github.io' # different repo, needs permission
+          token: ${{ secrets.SHI_PAT }}
+          # repository-name: 'aitok-ai/aitok-ai.github.io'
           # force: false
           
           

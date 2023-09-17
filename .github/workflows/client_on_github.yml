@@ -59,6 +59,7 @@ jobs:
         with:
           folder: './client/dist' # The folder the action should deploy.
           branch: gh-pages
-          repository-name: jinzishuai/LibreChat
+          # repository-name: jinzishuai/LibreChat
+          repository-name: jinzishuai/jinzishuai.github.io
           
        

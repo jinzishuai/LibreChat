@@ -1,7 +1,7 @@
 import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom';
 import Root from './Root';
-import Chat from './Chat';
-import Search from './Search';
+import ChatRoute from './ChatRoute';
+// import Search from './Search';
 import {
   Login,
   Registration,
@@ -44,16 +44,16 @@ export const router = createBrowserRouter([
         children: [
           {
             index: true,
-            element: <Navigate to="/chat/new" replace={true} />,
+            element: <Navigate to="/c/new" replace={true} />,
           },
           {
-            path: 'chat/:conversationId?',
-            element: <Chat />,
+            path: 'c/:conversationId?',
+            element: <ChatRoute />,
           },
-          {
-            path: 'search/:query?',
-            element: <Search />,
-          },
+          // {
+          //   path: 'search/:query?',
+          //   element: <Search />,
+          // },
         ],
       },
     ],

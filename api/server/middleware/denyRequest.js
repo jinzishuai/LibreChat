@@ -1,7 +1,7 @@
 const crypto = require('crypto');
-const { sendMessage, sendError } = require('../utils');
-const { getResponseSender } = require('../routes/endpoints/schemas');
-const { saveMessage } = require('../../models');
+const { getResponseSender, Constants } = require('librechat-data-provider');
+const { sendMessage, sendError } = require('~/server/utils');
+const { saveMessage } = require('~/models');
 
 /**
  * Denies a request by sending an error message and optionally saves the user's message.
@@ -38,11 +38,10 @@ const denyRequest = async (req, res, errorMessage) => {
   };
   sendMessage(res, { message: userMessage, created: true });
 
-  const shouldSaveMessage =
-    _convoId && parentMessageId && parentMessageId !== '00000000-0000-0000-0000-000000000000';
+  const shouldSaveMessage = _convoId && parentMessageId && parentMessageId !== Constants.NO_PARENT;
 
   if (shouldSaveMessage) {
-    await saveMessage(userMessage);
+    await saveMessage({ ...userMessage, user: req.user.id });
   }
 
   return await sendError(res, {
@@ -52,6 +51,7 @@ const denyRequest = async (req, res, errorMessage) => {
     parentMessageId: userMessage.messageId,
     text: responseText,
     shouldSaveMessage,
+    user: req.user.id,
   });
 };
 

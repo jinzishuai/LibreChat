@@ -1,27 +1,51 @@
-const { saveMessage, getConvo, getConvoTitle } = require('../../models');
-const { sendMessage, sendError } = require('../utils');
+const { EModelEndpoint } = require('librechat-data-provider');
+const { sendMessage, sendError, countTokens, isEnabled } = require('~/server/utils');
+const { saveMessage, getConvo, getConvoTitle } = require('~/models');
+const clearPendingReq = require('~/cache/clearPendingReq');
 const abortControllers = require('./abortControllers');
+const { redactMessage } = require('~/config/parsers');
+const spendTokens = require('~/models/spendTokens');
+const { abortRun } = require('./abortRun');
+const { logger } = require('~/config');
 
 async function abortMessage(req, res) {
-  const { abortKey } = req.body;
+  let { abortKey, conversationId, endpoint } = req.body;
+
+  if (!abortKey && conversationId) {
+    abortKey = conversationId;
+  }
+
+  if (endpoint === EModelEndpoint.assistants) {
+    return await abortRun(req, res);
+  }
 
   if (!abortControllers.has(abortKey) && !res.headersSent) {
-    return res.status(404).send('Request not found');
+    return res.status(204).send({ message: 'Request not found' });
   }
 
   const { abortController } = abortControllers.get(abortKey);
-  const ret = await abortController.abortCompletion();
-  console.log('Aborted request', abortKey);
+  const finalEvent = await abortController.abortCompletion();
+  logger.debug('[abortMessage] Aborted request', { abortKey });
   abortControllers.delete(abortKey);
-  res.send(JSON.stringify(ret));
+
+  if (res.headersSent && finalEvent) {
+    return sendMessage(res, finalEvent);
+  }
+
+  res.setHeader('Content-Type', 'application/json');
+
+  res.send(JSON.stringify(finalEvent));
 }
 
 const handleAbort = () => {
   return async (req, res) => {
     try {
+      if (isEnabled(process.env.LIMIT_CONCURRENT_MESSAGES)) {
+        await clearPendingReq({ userId: req.user.id });
+      }
       return await abortMessage(req, res);
     } catch (err) {
-      console.error(err);
+      logger.error('[abortMessage] handleAbort error', err);
     }
   };
 };
@@ -41,7 +65,9 @@ const createAbortController = (req, res, getAbortData) => {
 
   abortController.abortCompletion = async function () {
     abortController.abort();
-    const { conversationId, userMessage, ...responseData } = getAbortData();
+    const { conversationId, userMessage, promptTokens, ...responseData } = getAbortData();
+    const completionTokens = await countTokens(responseData?.text ?? '');
+    const user = req.user.id;
 
     const responseMessage = {
       ...responseData,
@@ -49,17 +75,22 @@ const createAbortController = (req, res, getAbortData) => {
       finish_reason: 'incomplete',
       model: endpointOption.modelOptions.model,
       unfinished: false,
-      cancelled: true,
       error: false,
       isCreatedByUser: false,
+      tokenCount: completionTokens,
     };
 
-    saveMessage(responseMessage);
+    await spendTokens(
+      { ...responseMessage, context: 'incomplete', user },
+      { promptTokens, completionTokens },
+    );
+
+    saveMessage({ ...responseMessage, user });
 
     return {
-      title: await getConvoTitle(req.user.id, conversationId),
+      title: await getConvoTitle(user, conversationId),
       final: true,
-      conversation: await getConvo(req.user.id, conversationId),
+      conversation: await getConvo(user, conversationId),
       requestMessage: userMessage,
       responseMessage: responseMessage,
     };
@@ -69,18 +100,35 @@ const createAbortController = (req, res, getAbortData) => {
 };
 
 const handleAbortError = async (res, req, error, data) => {
-  console.error(error);
+  logger.error('[handleAbortError] AI response error; aborting request:', error);
   const { sender, conversationId, messageId, parentMessageId, partialText } = data;
 
-  const respondWithError = async () => {
-    const options = {
+  if (error.stack && error.stack.includes('google')) {
+    logger.warn(
+      `AI Response error for conversation ${conversationId} likely caused by Google censor/filter`,
+    );
+  }
+
+  const respondWithError = async (partialText) => {
+    let options = {
       sender,
       messageId,
       conversationId,
       parentMessageId,
-      text: error.message,
+      text: redactMessage(error.message),
       shouldSaveMessage: true,
+      user: req.user.id,
     };
+
+    if (partialText) {
+      options = {
+        ...options,
+        error: false,
+        unfinished: true,
+        text: partialText,
+      };
+    }
+
     const callback = async () => {
       if (abortControllers.has(conversationId)) {
         const { abortController } = abortControllers.get(conversationId);
@@ -96,8 +144,8 @@ const handleAbortError = async (res, req, error, data) => {
     try {
       return await abortMessage(req, res);
     } catch (err) {
-      console.error(err);
-      return respondWithError();
+      logger.error('[handleAbortError] error while trying to abort message', err);
+      return respondWithError(partialText);
     }
   } else {
     return respondWithError();

@@ -1,16 +1,15 @@
 import React, { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useRecoilState, useRecoilValue } from 'recoil';
+// import TextChat from '~/components/Input/TextChat';
 
-import Messages from '~/components/Messages/Messages';
-import TextChat from '~/components/Input/TextChat';
-
+import { useConversation } from '~/hooks';
 import store from '~/store';
 
 export default function Search() {
   const [searchQuery, setSearchQuery] = useRecoilState(store.searchQuery);
   const conversation = useRecoilValue(store.conversation);
-  const { searchPlaceholderConversation } = store.useConversation();
+  const { searchPlaceholderConversation } = useConversation();
   const { query } = useParams();
   const navigate = useNavigate();
 
@@ -23,7 +22,7 @@ export default function Search() {
         searchPlaceholderConversation();
         setSearchQuery(query);
       } else {
-        navigate('/chat/new');
+        navigate('/c/new');
       }
     } else if (conversation?.conversationId === 'search') {
       // jump to search page
@@ -52,8 +51,8 @@ export default function Search() {
 
   return (
     <>
-      <Messages isSearchView={true} />
-      <TextChat isSearchView={true} />
+      {/* <Messages isSearchView={true} /> */}
+      {/* <TextChat isSearchView={true} /> */}
     </>
   );
 }

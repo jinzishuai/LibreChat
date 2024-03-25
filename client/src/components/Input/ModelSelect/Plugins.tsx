@@ -1,10 +1,11 @@
 import { useRecoilState } from 'recoil';
 import { useState, useEffect } from 'react';
 import { ChevronDownIcon } from 'lucide-react';
-import { useAvailablePluginsQuery, TPlugin } from 'librechat-data-provider';
+import { useAvailablePluginsQuery } from 'librechat-data-provider/react-query';
+import type { TPlugin } from 'librechat-data-provider';
 import type { TModelSelectProps } from '~/common';
-import { SelectDropDown, MultiSelectDropDown, Button } from '~/components/ui';
-import { useSetOptions, useAuthContext, useMediaQuery } from '~/hooks';
+import { SelectDropDown, MultiSelectDropDown, SelectDropDownPop, Button } from '~/components/ui';
+import { useSetOptions, useAuthContext, useMediaQuery, useLocalize } from '~/hooks';
 import { cn, cardStyle } from '~/utils/';
 import store from '~/store';
 
@@ -18,13 +19,21 @@ const pluginStore: TPlugin = {
   authenticated: false,
 };
 
-export default function Plugins({ conversation, setOption, models }: TModelSelectProps) {
+export default function Plugins({
+  conversation,
+  setOption,
+  models,
+  showAbove,
+  popover = false,
+}: TModelSelectProps) {
+  const localize = useLocalize();
   const { data: allPlugins } = useAvailablePluginsQuery();
   const [visible, setVisibility] = useState<boolean>(true);
   const [availableTools, setAvailableTools] = useRecoilState(store.availableTools);
   const { checkPluginSelection, setTools } = useSetOptions();
   const { user } = useAuthContext();
   const isSmallScreen = useMediaQuery('(max-width: 640px)');
+  const Menu = popover ? SelectDropDownPop : SelectDropDown;
 
   useEffect(() => {
     if (isSmallScreen) {
@@ -76,7 +85,7 @@ export default function Plugins({ conversation, setOption, models }: TModelSelec
         type="button"
         className={cn(
           cardStyle,
-          'min-w-4 z-40 flex h-[40px] flex-none items-center justify-center px-3 hover:bg-white focus:ring-0 focus:ring-offset-0 dark:hover:bg-gray-700',
+          'z-40 flex h-[40px] min-w-4 flex-none items-center justify-center px-3 hover:bg-white focus:ring-0 focus:ring-offset-0 dark:hover:bg-gray-700',
         )}
         onClick={() => setVisibility((prev) => !prev)}
       >
@@ -87,12 +96,12 @@ export default function Plugins({ conversation, setOption, models }: TModelSelec
           )}
         />
       </Button>
-      <SelectDropDown
+      <Menu
         value={conversation.model ?? ''}
         setValue={setOption('model')}
         availableValues={models}
-        showAbove={true}
-        className={cn(cardStyle, 'min-w-60 z-40 flex w-64 sm:w-48', visible ? '' : 'hidden')}
+        showAbove={showAbove}
+        className={cn(cardStyle, 'z-40 flex w-64 min-w-60 sm:w-48', visible ? '' : 'hidden')}
       />
       <MultiSelectDropDown
         value={conversation.tools || []}
@@ -100,8 +109,9 @@ export default function Plugins({ conversation, setOption, models }: TModelSelec
         setSelected={setTools}
         availableValues={availableTools}
         optionValueKey="pluginKey"
-        showAbove={true}
-        className={cn(cardStyle, 'min-w-60 z-50 w-64 sm:w-48', visible ? '' : 'hidden')}
+        showAbove={showAbove}
+        className={cn(cardStyle, 'z-50 w-64 min-w-60 sm:w-48', visible ? '' : 'hidden')}
+        searchPlaceholder={localize('com_ui_select_search_plugin')}
       />
     </>
   );

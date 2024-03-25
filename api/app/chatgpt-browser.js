@@ -1,5 +1,6 @@
 require('dotenv').config();
 const { KeyvFile } = require('keyv-file');
+const { Constants } = require('librechat-data-provider');
 const { getUserKey, checkUserKeyExpiry } = require('../server/services/UserService');
 
 const browserClient = async ({
@@ -24,7 +25,7 @@ const browserClient = async ({
     key = await getUserKey({ userId, name: 'chatGPTBrowser' });
   }
 
-  const { ChatGPTBrowserClient } = await import('@waylaidwanderer/chatgpt-api');
+  const { ChatGPTBrowserClient } = await import('nodejs-gpt');
   const store = {
     store: new KeyvFile({ filename: './data/cache.json' }),
   };
@@ -48,7 +49,7 @@ const browserClient = async ({
     options = { ...options, parentMessageId, conversationId };
   }
 
-  if (parentMessageId === '00000000-0000-0000-0000-000000000000') {
+  if (parentMessageId === Constants.NO_PARENT) {
     delete options.conversationId;
   }
 

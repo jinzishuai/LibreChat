@@ -1,9 +1,10 @@
 import { v4 } from 'uuid';
-import { useRecoilState, useRecoilValue, useSetRecoilState } from 'recoil';
 import { parseConvo, getResponseSender } from 'librechat-data-provider';
-import type { TMessage, TSubmission } from 'librechat-data-provider';
+import { useRecoilState, useRecoilValue, useSetRecoilState } from 'recoil';
+import { useGetEndpointsQuery } from 'librechat-data-provider/react-query';
+import type { TMessage, TSubmission, TEndpointOption } from 'librechat-data-provider';
 import type { TAskFunction } from '~/common';
-import useUserKey from './useUserKey';
+import useUserKey from './Input/useUserKey';
 import store from '~/store';
 
 const useMessageHandler = () => {
@@ -14,7 +15,7 @@ const useMessageHandler = () => {
   const currentConversation = useRecoilValue(store.conversation) || { endpoint: null };
   const setSubmission = useSetRecoilState(store.submission);
   const isSubmitting = useRecoilValue(store.isSubmitting);
-  const endpointsConfig = useRecoilValue(store.endpointsConfig);
+  const { data: endpointsConfig } = useGetEndpointsQuery();
   const [messages, setMessages] = useRecoilState(store.messages);
   const { endpoint } = currentConversation;
   const { getExpiry } = useUserKey(endpoint ?? '');
@@ -54,10 +55,10 @@ const useMessageHandler = () => {
     // set the endpoint option
     const convo = parseConvo(endpoint, currentConversation);
     const endpointOption = {
-      endpoint,
       ...convo,
+      endpoint,
       key: getExpiry(),
-    };
+    } as TEndpointOption;
     const responseSender = getResponseSender(endpointOption);
 
     let currentMessages: TMessage[] | null = messages ?? [];
@@ -75,9 +76,8 @@ const useMessageHandler = () => {
       conversationId = null;
     }
     const currentMsg: TMessage = {
-      sender: 'User',
       text,
-      current: true,
+      sender: 'User',
       isCreatedByUser: true,
       parentMessageId,
       conversationId,
@@ -87,9 +87,7 @@ const useMessageHandler = () => {
 
     // construct the placeholder response message
     const generation = editedText ?? latestMessage?.text ?? '';
-    const responseText = isEditOrContinue
-      ? generation
-      : '<span className="result-streaming">█</span>';
+    const responseText = isEditOrContinue ? generation : '';
 
     const responseMessageId = editedMessageId ?? latestMessage?.messageId ?? null;
     const initialResponse: TMessage = {
@@ -99,7 +97,6 @@ const useMessageHandler = () => {
       messageId: responseMessageId ?? `${isRegenerate ? messageId : fakeMessageId}_`,
       conversationId,
       unfinished: false,
-      submitting: true,
       isCreatedByUser: false,
       isEdited: isEditOrContinue,
       error: false,

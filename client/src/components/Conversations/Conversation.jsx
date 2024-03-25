@@ -1,18 +1,21 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { useRecoilState, useSetRecoilState } from 'recoil';
-import { useUpdateConversationMutation } from 'librechat-data-provider';
-import RenameButton from './RenameButton';
+import { useUpdateConversationMutation } from '~/data-provider';
+import { useConversations, useConversation } from '~/hooks';
+import { MinimalIcon } from '~/components/Endpoints';
+import { NotificationSeverity } from '~/common';
+import { useToastContext } from '~/Providers';
 import DeleteButton from './DeleteButton';
-import ConvoIcon from '../svg/ConvoIcon';
-
+import RenameButton from './RenameButton';
 import store from '~/store';
 
 export default function Conversation({ conversation, retainView }) {
+  const { showToast } = useToastContext();
   const [currentConversation, setCurrentConversation] = useRecoilState(store.conversation);
   const setSubmission = useSetRecoilState(store.submission);
 
-  const { refreshConversations } = store.useConversations();
-  const { switchToConversation } = store.useConversation();
+  const { refreshConversations } = useConversations();
+  const { switchToConversation } = useConversation();
 
   const updateConvoMutation = useUpdateConversationMutation(currentConversation?.conversationId);
 
@@ -63,21 +66,37 @@ export default function Conversation({ conversation, retainView }) {
     if (titleInput === title) {
       return;
     }
-    updateConvoMutation.mutate({ conversationId, title: titleInput });
+    updateConvoMutation.mutate(
+      { conversationId, title: titleInput },
+      {
+        onSuccess: () => {
+          refreshConversations();
+          if (conversationId == currentConversation?.conversationId) {
+            setCurrentConversation((prevState) => ({
+              ...prevState,
+              title: titleInput,
+            }));
+          }
+        },
+        onError: () => {
+          setTitleInput(title);
+          showToast({
+            message: 'Failed to rename conversation',
+            severity: NotificationSeverity.ERROR,
+            showIcon: true,
+          });
+        },
+      },
+    );
   };
 
-  useEffect(() => {
-    if (updateConvoMutation.isSuccess) {
-      refreshConversations();
-      if (conversationId == currentConversation?.conversationId) {
-        setCurrentConversation((prevState) => ({
-          ...prevState,
-          title: titleInput,
-        }));
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [updateConvoMutation.isSuccess]);
+  const icon = MinimalIcon({
+    size: 20,
+    endpoint: conversation.endpoint,
+    model: conversation.model,
+    error: false,
+    className: 'mr-0',
+  });
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
@@ -87,17 +106,17 @@ export default function Conversation({ conversation, retainView }) {
 
   const aProps = {
     className:
-      'animate-flash group relative flex cursor-pointer items-center gap-3 break-all rounded-md bg-gray-800 py-3 px-3 pr-14 hover:bg-gray-800',
+      'animate-flash group relative flex cursor-pointer items-center gap-3 break-all rounded-md bg-gray-300 dark:bg-gray-800 py-3 px-3 pr-14',
   };
 
   if (currentConversation?.conversationId !== conversationId) {
     aProps.className =
-      'group relative flex cursor-pointer items-center gap-3 break-all rounded-md py-3 px-3 hover:bg-gray-800 hover:pr-4';
+      'group relative flex cursor-pointer items-center gap-3 break-all rounded-md py-3 px-3 hover:bg-gray-200 dark:hover:bg-gray-800 hover:pr-4';
   }
 
   return (
     <a data-testid="convo-item" onClick={() => clickHandler()} {...aProps}>
-      <ConvoIcon />
+      {icon}
       <div className="relative max-h-5 flex-1 overflow-hidden text-ellipsis break-all">
         {renaming === true ? (
           <input
@@ -130,7 +149,7 @@ export default function Conversation({ conversation, retainView }) {
           />
         </div>
       ) : (
-        <div className="absolute inset-y-0 right-0 z-10 w-8 rounded-r-md bg-gradient-to-l from-gray-900 group-hover:from-gray-700/70" />
+        <div className="absolute inset-y-0 right-0 z-10 w-8 rounded-r-md bg-gradient-to-l from-gray-50 group-hover:from-gray-50 dark:from-gray-900 dark:group-hover:from-gray-800" />
       )}
     </a>
   );

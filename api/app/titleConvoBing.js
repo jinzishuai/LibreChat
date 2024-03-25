@@ -1,8 +1,15 @@
 const throttle = require('lodash/throttle');
+const { isEnabled } = require('~/server/utils');
+const { logger } = require('~/config');
 
 const titleConvo = async ({ text, response }) => {
   let title = 'New Chat';
-  const { BingAIClient } = await import('@waylaidwanderer/chatgpt-api');
+  const { TITLE_CONVO = 'true' } = process.env ?? {};
+  if (!isEnabled(TITLE_CONVO)) {
+    return title;
+  }
+
+  const { BingAIClient } = await import('nodejs-gpt');
   const titleGenerator = new BingAIClient({
     userToken: process.env.BINGAI_TOKEN,
     debug: false,
@@ -24,11 +31,10 @@ const titleConvo = async ({ text, response }) => {
     const res = await titleGenerator.sendMessage(titlePrompt, options);
     title = res.response.replace(/Title: /, '').replace(/[".]/g, '');
   } catch (e) {
-    console.error(e);
-    console.log('There was an issue generating title, see error above');
+    logger.error('There was an issue generating title with BingAI', e);
   }
 
-  console.log('CONVERSATION TITLE', title);
+  logger.debug('[/ask/bingAI] CONVERSATION TITLE: ' + title);
   return title;
 };
 

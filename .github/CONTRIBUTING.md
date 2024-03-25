@@ -8,7 +8,7 @@ If the feature you would like to contribute has not already received prior appro
 
 Please note that a pull request involving a feature that has not been reviewed and approved by the project maintainers may be rejected. We appreciate your understanding and cooperation.
 
-If you would like to discuss the changes you wish to make, join our [Discord community](https://discord.gg/uDyZ5Tzhct), where you can engage with other contributors and seek guidance from the community.
+If you would like to discuss the changes you wish to make, join our [Discord community](https://discord.librechat.ai), where you can engage with other contributors and seek guidance from the community.
 
 ## Our Standards
 
@@ -33,7 +33,7 @@ Project maintainers have the right and responsibility to remove, edit, or reject
 4. Clear web app localStorage and cookies before and after changes.
 5. For frontend changes:
     - Install typescript globally: `npm i -g typescript`.
-    - Compile typescript before and after changes to check for introduced errors: `tsc --noEmit`.
+    - Compile typescript before and after changes to check for introduced errors: `cd client && tsc --noEmit`.
 6. Run tests locally:
     - Backend unit tests: `npm run test:api`
     - Frontend unit tests: `npm run test:client`

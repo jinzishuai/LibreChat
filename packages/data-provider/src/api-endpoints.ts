@@ -1,5 +1,7 @@
 export const user = () => '/api/user';
 
+export const balance = () => '/api/balance';
+
 export const userPlugins = () => '/api/user/plugins';
 
 export const messages = (conversationId: string, messageId?: string) =>
@@ -21,6 +23,8 @@ export const conversations = (pageNumber: string) => `/api/convos?pageNumber=${p
 
 export const conversationById = (id: string) => `/api/convos/${id}`;
 
+export const genTitle = () => '/api/convos/gen_title';
+
 export const updateConversation = () => '/api/convos/update';
 
 export const deleteConversation = () => '/api/convos/clear';
@@ -36,6 +40,10 @@ export const deletePreset = () => '/api/presets/delete';
 
 export const aiEndpoints = () => '/api/endpoints';
 
+export const endpointsConfigOverride = () => '/api/endpoints/config/override';
+
+export const models = () => '/api/models';
+
 export const tokenizer = () => '/api/tokenizer';
 
 export const login = () => '/api/auth/login';
@@ -48,7 +56,7 @@ export const loginFacebook = () => '/api/auth/facebook';
 
 export const loginGoogle = () => '/api/auth/google';
 
-export const refreshToken = () => '/api/auth/refresh';
+export const refreshToken = (retry?: boolean) => `/api/auth/refresh${retry ? '?retry=true' : ''}`;
 
 export const requestPasswordReset = () => '/api/auth/requestPasswordReset';
 
@@ -57,3 +65,24 @@ export const resetPassword = () => '/api/auth/resetPassword';
 export const plugins = () => '/api/plugins';
 
 export const config = () => '/api/config';
+
+export const assistants = (id?: string, options?: Record<string, string>) => {
+  let url = '/api/assistants';
+
+  if (id) {
+    url += `/${id}`;
+  }
+
+  if (options && Object.keys(options).length > 0) {
+    const queryParams = new URLSearchParams(options).toString();
+    url += `?${queryParams}`;
+  }
+
+  return url;
+};
+
+export const files = () => '/api/files';
+
+export const images = () => `${files()}/images`;
+
+export const avatar = () => `${images()}/avatar`;

@@ -1,15 +1,32 @@
 const { z } = require('zod');
 
-function errorsToString(errors) {
-  return errors
-    .map((error) => {
-      let field = error.path.join('.');
-      let message = error.message;
+const allowedCharactersRegex = new RegExp(
+  '^[' +
+    'a-zA-Z0-9_.@#$%&*()' + // Basic Latin characters and symbols
+    '\\p{Script=Latin}' + // Latin script characters
+    '\\p{Script=Common}' + // Characters common across scripts
+    '\\p{Script=Cyrillic}' + // Cyrillic script for Russian, etc.
+    '\\p{Script=Devanagari}' + // Devanagari script for Hindi, etc.
+    '\\p{Script=Han}' + // Han script for Chinese characters, etc.
+    '\\p{Script=Arabic}' + // Arabic script
+    '\\p{Script=Hiragana}' + // Hiragana script for Japanese
+    '\\p{Script=Katakana}' + // Katakana script for Japanese
+    '\\p{Script=Hangul}' + // Hangul script for Korean
+    ']+$', // End of string
+  'u', // Use Unicode mode
+);
+const injectionPatternsRegex = /('|--|\$ne|\$gt|\$lt|\$or|\{|\}|\*|;|<|>|\/|=)/i;
 
-      return `${field}: ${message}`;
-    })
-    .join(' ');
-}
+const usernameSchema = z
+  .string()
+  .min(2)
+  .max(80)
+  .refine((value) => allowedCharactersRegex.test(value), {
+    message: 'Invalid characters in username',
+  })
+  .refine((value) => !injectionPatternsRegex.test(value), {
+    message: 'Potential injection attack detected',
+  });
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -26,14 +43,7 @@ const registerSchema = z
   .object({
     name: z.string().min(3).max(80),
     username: z
-      .union([
-        z.literal(''),
-        z
-          .string()
-          .min(2)
-          .max(80)
-          .regex(/^[a-zA-Z0-9_.-@#$%&*() ]+$/),
-      ])
+      .union([z.literal(''), usernameSchema])
       .transform((value) => (value === '' ? null : value))
       .optional()
       .nullable(),
@@ -65,5 +75,4 @@ const registerSchema = z
 module.exports = {
   loginSchema,
   registerSchema,
-  errorsToString,
 };

@@ -1,13 +1,41 @@
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
-const User = require('../../models/User');
-const Session = require('../../models/Session');
-const Token = require('../../models/schema/tokenSchema');
-const { registerSchema, errorsToString } = require('../../strategies/validators');
-const config = require('../../../config/loader');
-const { sendEmail } = require('../utils');
-const domains = config.domains;
-const isProduction = config.isProduction;
+const { errorsToString } = require('librechat-data-provider');
+const { registerSchema } = require('~/strategies/validators');
+const getCustomConfig = require('~/server/services/Config/getCustomConfig');
+const Token = require('~/models/schema/tokenSchema');
+const { sendEmail } = require('~/server/utils');
+const Session = require('~/models/Session');
+const { logger } = require('~/config');
+const User = require('~/models/User');
+
+const domains = {
+  client: process.env.DOMAIN_CLIENT,
+  server: process.env.DOMAIN_SERVER,
+};
+
+async function isDomainAllowed(email) {
+  if (!email) {
+    return false;
+  }
+
+  const domain = email.split('@')[1];
+
+  if (!domain) {
+    return false;
+  }
+
+  const customConfig = await getCustomConfig();
+  if (!customConfig) {
+    return true;
+  } else if (!customConfig?.registration?.allowedDomains) {
+    return true;
+  }
+
+  return customConfig.registration.allowedDomains.includes(domain);
+}
+
+const isProduction = process.env.NODE_ENV === 'production';
 
 /**
  * Logout user
@@ -26,7 +54,7 @@ const logoutUser = async (userId, refreshToken) => {
       try {
         await Session.deleteOne({ _id: session._id });
       } catch (deleteErr) {
-        console.error(deleteErr);
+        logger.error('[logoutUser] Failed to delete session.', deleteErr);
         return { status: 500, message: 'Failed to delete session.' };
       }
     }
@@ -47,7 +75,7 @@ const registerUser = async (user) => {
   const { error } = registerSchema.safeParse(user);
   if (error) {
     const errorMessage = errorsToString(error.errors);
-    console.info(
+    logger.info(
       'Route: register - Validation Error',
       { name: 'Request params:', value: user },
       { name: 'Validation error:', value: errorMessage },
@@ -62,7 +90,7 @@ const registerUser = async (user) => {
     const existingUser = await User.findOne({ email }).lean();
 
     if (existingUser) {
-      console.info(
+      logger.info(
         'Register User - Email in use',
         { name: 'Request params:', value: user },
         { name: 'Existing user:', value: existingUser },
@@ -73,6 +101,12 @@ const registerUser = async (user) => {
 
       // TODO: We should change the process to always email and be generic is signup works or fails (user enum)
       return { status: 500, message: 'Something went wrong' };
+    }
+
+    if (!(await isDomainAllowed(email))) {
+      const errorMessage = 'Registration from this domain is not allowed.';
+      logger.error(`[registerUser] [Registration not allowed] [Email: ${user.email}]`);
+      return { status: 403, message: errorMessage };
     }
 
     //determine if this is the first registered user (not counting anonymous_user)
@@ -91,7 +125,7 @@ const registerUser = async (user) => {
     const salt = bcrypt.genSaltSync(10);
     const hash = bcrypt.hashSync(newUser.password, salt);
     newUser.password = hash;
-    newUser.save();
+    await newUser.save();
 
     return { status: 200, user: newUser };
   } catch (err) {
@@ -117,7 +151,7 @@ const requestPasswordReset = async (email) => {
   }
 
   let resetToken = crypto.randomBytes(32).toString('hex');
-  const hash = await bcrypt.hashSync(resetToken, 10);
+  const hash = bcrypt.hashSync(resetToken, 10);
 
   await new Token({
     userId: user._id,
@@ -128,7 +162,7 @@ const requestPasswordReset = async (email) => {
   const link = `${domains.client}/reset-password?token=${resetToken}&userId=${user._id}`;
 
   const emailEnabled =
-    !!process.env.EMAIL_SERVICE &&
+    (!!process.env.EMAIL_SERVICE || !!process.env.EMAIL_HOST) &&
     !!process.env.EMAIL_USERNAME &&
     !!process.env.EMAIL_PASSWORD &&
     !!process.env.EMAIL_FROM;
@@ -138,8 +172,10 @@ const requestPasswordReset = async (email) => {
       user.email,
       'Password Reset Request',
       {
+        appName: process.env.APP_TITLE || 'LibreChat',
         name: user.name,
         link: link,
+        year: new Date().getFullYear(),
       },
       'requestPasswordReset.handlebars',
     );
@@ -180,9 +216,11 @@ const resetPassword = async (userId, token, password) => {
     user.email,
     'Password Reset Successfully',
     {
+      appName: process.env.APP_TITLE || 'LibreChat',
       name: user.name,
+      year: new Date().getFullYear(),
     },
-    'resetPassword.handlebars',
+    'passwordReset.handlebars',
   );
 
   await passwordResetToken.deleteOne();
@@ -226,7 +264,7 @@ const setAuthTokens = async (userId, res, sessionId = null) => {
 
     return token;
   } catch (error) {
-    console.log('Error in setting authentication tokens:', error);
+    logger.error('[setAuthTokens] Error in setting authentication tokens:', error);
     throw error;
   }
 };
@@ -234,6 +272,7 @@ const setAuthTokens = async (userId, res, sessionId = null) => {
 module.exports = {
   registerUser,
   logoutUser,
+  isDomainAllowed,
   requestPasswordReset,
   resetPassword,
   setAuthTokens,

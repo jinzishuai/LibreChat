@@ -9,10 +9,14 @@ const tokenizer = require('./tokenizer');
 const auth = require('./auth');
 const keys = require('./keys');
 const oauth = require('./oauth');
-const { router: endpoints } = require('./endpoints');
+const endpoints = require('./endpoints');
+const balance = require('./balance');
+const models = require('./models');
 const plugins = require('./plugins');
 const user = require('./user');
 const config = require('./config');
+const assistants = require('./assistants');
+const files = require('./files');
 
 module.exports = {
   search,
@@ -28,6 +32,10 @@ module.exports = {
   user,
   tokenizer,
   endpoints,
+  balance,
+  models,
   plugins,
   config,
+  assistants,
+  files,
 };
